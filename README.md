@@ -1,71 +1,31 @@
-# disable-eslint-rule-in-project README
+# Disable ESLint Rule in Project
 
-This is the README for your extension "disable-eslint-rule-in-project". After writing up a brief description, we recommend including the following sections.
+This Visual Studio Code extension allows you to quickly disable an ESLint rule directly from the editor. When you encounter an ESLint error, the extension adds a quick fix option to disable the rule causing the error in your ESLint configuration file. It works with `.json` and `.js` ESLint configuration file formats.
 
 ## Features
 
-Describe specific features of your extension including screenshots of your extension in action. Image paths are relative to this README file.
-
-For example if there is an image subfolder under your extension project workspace:
-
-\!\[feature X\]\(images/feature-x.png\)
-
-> Tip: Many popular extensions utilize animations. This is an excellent way to show off your extension! We recommend short, focused animations that are easy to follow.
+- Adds a "Disable rule {rule-name} in project" option to the Quick Fix menu for ESLint errors.
+- Automatically updates the ESLint configuration file in your project to disable the selected rule.
 
 ## Requirements
 
-If you have any requirements or dependencies, add a section describing those and how to install and configure them.
+This extension works in conjunction with the [ESLint extension](https://marketplace.visualstudio.com/items?itemName=dbaeumer.vscode-eslint) for Visual Studio Code. Ensure that you have the ESLint extension installed and properly configured in your project.
 
-## Extension Settings
+## Usage
 
-Include if your extension adds any VS Code settings through the `contributes.configuration` extension point.
+1. Open a JavaScript file with ESLint errors.
+2. Hover over the error and click on the lightbulb icon that appears.
+3. Select the "Disable rule {rule-name} in project" option from the Quick Fix menu.
+4. The extension will update your ESLint configuration file, disabling the selected rule for the entire project.
 
-For example:
+## Known Limitations
 
-This extension contributes the following settings:
+- This extension currently supports only `.json` and `.js` ESLint configuration file formats. Other formats, like `.yml` and `.yaml`, are not supported.
 
-* `myExtension.enable`: Enable/disable this extension.
-* `myExtension.thing`: Set to `blah` to do something.
+## Contributing
 
-## Known Issues
+If you have any suggestions, bug reports, or feature requests, feel free to [create an issue](https://github.com/yourusername/disable-eslint-rule-in-project/issues) or submit a pull request.
 
-Calling out known issues can help limit users opening duplicate issues against your extension.
+## License
 
-## Release Notes
-
-Users appreciate release notes as you update your extension.
-
-### 1.0.0
-
-Initial release of ...
-
-### 1.0.1
-
-Fixed issue #.
-
-### 1.1.0
-
-Added features X, Y, and Z.
-
----
-
-## Following extension guidelines
-
-Ensure that you've read through the extensions guidelines and follow the best practices for creating your extension.
-
-* [Extension Guidelines](https://code.visualstudio.com/api/references/extension-guidelines)
-
-## Working with Markdown
-
-You can author your README using Visual Studio Code. Here are some useful editor keyboard shortcuts:
-
-* Split the editor (`Cmd+\` on macOS or `Ctrl+\` on Windows and Linux).
-* Toggle preview (`Shift+Cmd+V` on macOS or `Shift+Ctrl+V` on Windows and Linux).
-* Press `Ctrl+Space` (Windows, Linux, macOS) to see a list of Markdown snippets.
-
-## For more information
-
-* [Visual Studio Code's Markdown Support](http://code.visualstudio.com/docs/languages/markdown)
-* [Markdown Syntax Reference](https://help.github.com/articles/markdown-basics/)
-
-**Enjoy!**
+This extension is released under the [MIT License](https://opensource.org/licenses/MIT).

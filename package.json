@@ -1,26 +1,21 @@
 {
   "name": "disable-eslint-rule-in-project",
   "displayName": "Disable ESLint Rule in Project",
-  "description": "Adds an option to disable an ESLint rule in the eslintrc file of the project.",
-  "version": "0.0.1",
+  "description": "Adds an option to quickfix menu which disables an ESLint rule in the eslintrc file of the project.",
+  "version": "0.1.0",
   "engines": {
     "vscode": "^1.77.0"
   },
   "categories": [
     "Other"
   ],
-  "activationEvents": [
-    "onCommand:disable-eslint-rule-in-project.disableRule"
-  ],
   "main": "./out/extension.js",
-  "contributes": {
-    "commands": [
-      {
-        "command": "disable-eslint-rule-in-project.disableRule",
-        "title": "Disable ESLint Rule in Project"
-      }
-    ]
-  },
+  "activationEvents": [
+    "onLanguage:javascript",
+    "onLanguage:typescript",
+    "onLanguage:javascriptreact",
+    "onLanguage:typescriptreact"
+  ],
   "scripts": {
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",

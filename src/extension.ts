@@ -3,36 +3,28 @@ import * as fs from 'fs-extra';
 import * as path from 'path';
 
 export function activate(context: vscode.ExtensionContext) {
+  context.subscriptions.push(
+    vscode.languages.registerCodeActionsProvider(
+      { pattern: '**/*.{js,ts,jsx,tsx}', scheme: 'file' },
+      new DisableEslintRuleProvider(),
+      {
+        providedCodeActionKinds: DisableEslintRuleProvider.providedCodeActionKinds,
+      }
+    )
+  );
+
   let disposable = vscode.commands.registerCommand(
     'disable-eslint-rule-in-project.disableRule',
-    async () => {
-      const editor = vscode.window.activeTextEditor;
-      if (!editor) {
+    async (document?: vscode.TextDocument, diagnostic?: vscode.Diagnostic) => {
+      if (!diagnostic) {
+        diagnostic = await getCurrentDiagnostic();
+      }
+
+      if (!diagnostic) {
         return;
       }
 
-      const diagnostics = vscode.languages.getDiagnostics(editor.document.uri);
-      const eslintDiagnostics = diagnostics.filter((diagnostic) => diagnostic.source === 'eslint');
-
-      if (!eslintDiagnostics.length) {
-        vscode.window.showInformationMessage('No ESLint errors found in the current file.');
-        return;
-      }
-
-      const selectedDiagnostic = await vscode.window.showQuickPick(
-        eslintDiagnostics.map((diagnostic) => ({
-          label: diagnostic.message,
-          detail: `Rule: ${getRuleName(diagnostic)}`,
-          diagnostic,
-        })),
-        { placeHolder: 'Select ESLint error to disable' }
-      );
-
-      if (!selectedDiagnostic) {
-        return;
-      }
-
-      const ruleName = getRuleName(selectedDiagnostic.diagnostic);
+      const ruleName = getRuleName(diagnostic);
 
       const workspaceFolders = vscode.workspace.workspaceFolders;
       if (!workspaceFolders) {
@@ -113,4 +105,68 @@ async function writeEslintConfig(configPath: string, config: any): Promise<void>
   } else {
     throw new Error(`Unsupported ESLint configuration format: ${configPath}`);
   }
+}
+
+class DisableEslintRuleProvider implements vscode.CodeActionProvider {
+  public static readonly providedCodeActionKinds = [vscode.CodeActionKind.QuickFix];
+
+  provideCodeActions(
+    document: vscode.TextDocument,
+    range: vscode.Range,
+    context: vscode.CodeActionContext,
+    token: vscode.CancellationToken
+  ): vscode.ProviderResult<vscode.CodeAction[]> {
+    const eslintDiagnostics = context.diagnostics.filter(
+      (diagnostic) => diagnostic.source === 'eslint'
+    );
+
+    if (!eslintDiagnostics.length) {
+      return;
+    }
+
+    const actions: vscode.CodeAction[] = [];
+
+    for (const diagnostic of eslintDiagnostics) {
+      const ruleName = getRuleName(diagnostic);
+      const action = new vscode.CodeAction(
+        `Disable ESLint Rule '${ruleName}' in Project`,
+        vscode.CodeActionKind.QuickFix
+      );
+      action.command = {
+        title: 'Disable ESLint Rule in Project',
+        command: 'disable-eslint-rule-in-project.disableRule',
+        arguments: [document, diagnostic],
+      };
+      actions.push(action);
+    }
+
+    return actions;
+  }
+}
+
+async function getCurrentDiagnostic() {
+  const editor = vscode.window.activeTextEditor;
+  if (!editor) {
+    return;
+  }
+
+  const diagnostics = vscode.languages.getDiagnostics(editor.document.uri);
+  const eslintDiagnostics = diagnostics.filter((diagnostic) => diagnostic.source === 'eslint');
+  if (!eslintDiagnostics.length) {
+    vscode.window.showInformationMessage('No ESLint errors found in the current file.');
+    return;
+  }
+  const selectedDiagnostic = await vscode.window.showQuickPick(
+    eslintDiagnostics.map((diagnostic) => ({
+      label: diagnostic.message,
+      detail: `Rule: ${getRuleName(diagnostic)}`,
+      diagnostic,
+    })),
+    { placeHolder: 'Select ESLint error to disable' }
+  );
+  if (!selectedDiagnostic) {
+    return;
+  }
+
+  return selectedDiagnostic.diagnostic;
 }
