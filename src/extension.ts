@@ -16,13 +16,9 @@ export function activate(context: vscode.ExtensionContext) {
   let disposable = vscode.commands.registerCommand(
     'disable-eslint-rule-in-project.disableRule',
     async (document?: vscode.TextDocument, diagnostic?: vscode.Diagnostic) => {
-      if (!diagnostic) {
-        diagnostic = await getCurrentDiagnostic();
-      }
+      if (!diagnostic) diagnostic = await getCurrentDiagnostic();
 
-      if (!diagnostic) {
-        return;
-      }
+      if (!diagnostic) return;
 
       const ruleName = getRuleName(diagnostic);
 
@@ -129,11 +125,11 @@ class DisableEslintRuleProvider implements vscode.CodeActionProvider {
     for (const diagnostic of eslintDiagnostics) {
       const ruleName = getRuleName(diagnostic);
       const action = new vscode.CodeAction(
-        `Disable ESLint Rule '${ruleName}' in Project`,
+        `Disable ESLint rule '${ruleName}' in the project`,
         vscode.CodeActionKind.QuickFix
       );
       action.command = {
-        title: 'Disable ESLint Rule in Project',
+        title: 'Disable ESLint rule in the project',
         command: 'disable-eslint-rule-in-project.disableRule',
         arguments: [document, diagnostic],
       };
