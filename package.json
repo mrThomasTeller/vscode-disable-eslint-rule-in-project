@@ -2,7 +2,9 @@
   "name": "disable-eslint-rule-in-project",
   "displayName": "Disable ESLint Rule in Project",
   "description": "Adds an option to quickfix menu which disables an ESLint rule in the eslintrc file of the project.",
-  "version": "0.1.0",
+  "version": "0.2.0",
+  "license": "MIT",
+  "icon": "icon.png",
   "author": {
     "name": "Artem Bakharev",
     "url": "https://github.com/mrThomasTeller/"
@@ -12,7 +14,7 @@
     "url": "https://github.com/mrThomasTeller/vscode-disable-eslint-rule-in-project"
   },
   "engines": {
-    "vscode": "^1.77.0"
+    "vscode": "^1.54.0"
   },
   "categories": [
     "Other"
@@ -40,7 +42,7 @@
     "@types/glob": "^8.1.0",
     "@types/mocha": "^10.0.1",
     "@types/node": "16.x",
-    "@types/vscode": "^1.77.0",
+    "@types/vscode": "^1.54.0",
     "@typescript-eslint/eslint-plugin": "^5.56.0",
     "@typescript-eslint/parser": "^5.56.0",
     "@vscode/test-electron": "^2.3.0",

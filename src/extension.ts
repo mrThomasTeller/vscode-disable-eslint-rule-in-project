@@ -8,12 +8,13 @@ export function activate(context: vscode.ExtensionContext) {
       { pattern: '**/*.{js,ts,jsx,tsx}', scheme: 'file' },
       new DisableEslintRuleProvider(),
       {
-        providedCodeActionKinds: DisableEslintRuleProvider.providedCodeActionKinds,
+        providedCodeActionKinds:
+          DisableEslintRuleProvider.providedCodeActionKinds,
       }
     )
   );
 
-  let disposable = vscode.commands.registerCommand(
+  const disposable = vscode.commands.registerCommand(
     'disable-eslint-rule-in-project.disableRule',
     async (document?: vscode.TextDocument, diagnostic?: vscode.Diagnostic) => {
       if (!diagnostic) diagnostic = await getCurrentDiagnostic();
@@ -28,11 +29,11 @@ export function activate(context: vscode.ExtensionContext) {
         return;
       }
 
-      const workspaceRoot = workspaceFolders[0].uri.fsPath;
-      const eslintrcPath = await findEslintConfigFile(workspaceRoot);
+      const eslintrcPath =
+        document?.fileName && (await findEslintConfigFile(document?.fileName));
 
       if (!eslintrcPath) {
-        vscode.window.showErrorMessage('ESLint configuration file not found in the workspace root');
+        vscode.window.showErrorMessage('ESLint configuration file not found');
         return;
       }
 
@@ -52,7 +53,9 @@ export function activate(context: vscode.ExtensionContext) {
         );
       } catch (error) {
         vscode.window.showErrorMessage(
-          `An error occurred while updating .eslintrc file: ${(error as any).message}`
+          `An error occurred while updating .eslintrc file: ${
+            (error as any).message
+          }`
         );
       }
     }
@@ -69,14 +72,40 @@ function getRuleName(diagnostic: vscode.Diagnostic) {
   return ruleName;
 }
 
-async function findEslintConfigFile(workspaceRoot: string): Promise<string | null> {
-  const configFileNames = ['.eslintrc.js', '.eslintrc.json', '.eslintrc'];
+async function findEslintConfigFile(
+  currentFile: string
+): Promise<string | null> {
+  const configFileNames = [
+    '.eslintrc.js',
+    '.eslintrc.json',
+    '.eslintrc',
+    'package.json',
+  ];
 
-  for (const fileName of configFileNames) {
-    const configPath = path.join(workspaceRoot, fileName);
-    if (await fs.pathExists(configPath)) {
-      return configPath;
+  // find the nearest ESLint config file
+  let dir = path.dirname(currentFile);
+
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    for (const configFileName of configFileNames) {
+      const configFilePath = path.join(dir, configFileName);
+      if (await fs.pathExists(configFilePath)) {
+        if (configFileName === 'package.json') {
+          const packageJson = await fs.readJson(configFilePath);
+          if (!packageJson.eslintConfig) {
+            continue;
+          }
+        }
+
+        return configFilePath;
+      }
     }
+
+    const parentDir = path.dirname(dir);
+    if (dir === parentDir) {
+      break;
+    }
+    dir = parentDir;
   }
 
   return null;
@@ -84,18 +113,36 @@ async function findEslintConfigFile(workspaceRoot: string): Promise<string | nul
 
 async function readEslintConfig(configPath: string): Promise<any> {
   const ext = path.extname(configPath);
+  const fileName = path.basename(configPath);
+
   if (ext === '.js') {
     return require(configPath);
+  } else if (fileName === 'package.json') {
+    const packageJson = await fs.readJson(configPath);
+    return packageJson.eslintConfig;
   } else if (ext === '.json' || ext === '') {
     return fs.readJson(configPath);
   }
+
   throw new Error(`Unsupported ESLint configuration format: ${configPath}`);
 }
 
-async function writeEslintConfig(configPath: string, config: any): Promise<void> {
+async function writeEslintConfig(
+  configPath: string,
+  config: any
+): Promise<void> {
   const ext = path.extname(configPath);
+  const fileName = path.basename(configPath);
+
   if (ext === '.js') {
-    await fs.writeFile(configPath, `module.exports = ${JSON.stringify(config, null, 2)}`);
+    await fs.writeFile(
+      configPath,
+      `module.exports = ${JSON.stringify(config, null, 2)}`
+    );
+  } else if (fileName === 'package.json') {
+    const packageJson = await fs.readJson(configPath);
+    packageJson.eslintConfig = config;
+    await fs.writeJson(configPath, packageJson, { spaces: 2 });
   } else if (ext === '.json' || ext === '') {
     await fs.writeJson(configPath, config, { spaces: 2 });
   } else {
@@ -104,7 +151,9 @@ async function writeEslintConfig(configPath: string, config: any): Promise<void>
 }
 
 class DisableEslintRuleProvider implements vscode.CodeActionProvider {
-  public static readonly providedCodeActionKinds = [vscode.CodeActionKind.QuickFix];
+  public static readonly providedCodeActionKinds = [
+    vscode.CodeActionKind.QuickFix,
+  ];
 
   provideCodeActions(
     document: vscode.TextDocument,
@@ -147,9 +196,13 @@ async function getCurrentDiagnostic() {
   }
 
   const diagnostics = vscode.languages.getDiagnostics(editor.document.uri);
-  const eslintDiagnostics = diagnostics.filter((diagnostic) => diagnostic.source === 'eslint');
+  const eslintDiagnostics = diagnostics.filter(
+    (diagnostic) => diagnostic.source === 'eslint'
+  );
   if (!eslintDiagnostics.length) {
-    vscode.window.showInformationMessage('No ESLint errors found in the current file.');
+    vscode.window.showInformationMessage(
+      'No ESLint errors found in the current file.'
+    );
     return;
   }
   const selectedDiagnostic = await vscode.window.showQuickPick(
