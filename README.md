@@ -24,7 +24,7 @@ This extension works in conjunction with the [ESLint extension](https://marketpl
 
 ## Known Limitations
 
-- This extension currently supports only `.json` and `.js` ESLint configuration file formats. Other formats, like `.yml` and `.yaml`, are not supported.
+- This extension currently supports only `.eslintrc.json`, `.eslintrc.js` and `package.json` ESLint configuration file formats. Other formats, like `.yml` and `.yaml`, are not supported.
 
 ## Contributing
 
