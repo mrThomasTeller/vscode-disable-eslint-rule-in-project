@@ -77,6 +77,7 @@ async function findEslintConfigFile(
 ): Promise<string | null> {
   const configFileNames = [
     '.eslintrc.js',
+    '.eslintrc.cjs',
     '.eslintrc.json',
     '.eslintrc',
     'package.json',
