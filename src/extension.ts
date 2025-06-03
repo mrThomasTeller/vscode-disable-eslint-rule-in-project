@@ -1,6 +1,12 @@
 import * as vscode from 'vscode';
-import * as fs from 'fs-extra';
-import * as path from 'path';
+import { findConfigFile } from './helpers/findConfigFile';
+import { 
+  readConfigFile, 
+  writeConfigFile, 
+  isFlatConfig, 
+  updateRuleInFlatConfig, 
+  updateRuleInLegacyConfig 
+} from './helpers/readConfigFile';
 
 export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
@@ -30,7 +36,7 @@ export function activate(context: vscode.ExtensionContext) {
       }
 
       const eslintrcPath =
-        document?.fileName && (await findEslintConfigFile(document?.fileName));
+        document?.fileName && (await findConfigFile(document?.fileName));
 
       if (!eslintrcPath) {
         vscode.window.showErrorMessage('ESLint configuration file not found');
@@ -38,7 +44,7 @@ export function activate(context: vscode.ExtensionContext) {
       }
 
       try {
-        const eslintConfig = await readEslintConfig(eslintrcPath);
+        const eslintConfig = await readConfigFile(eslintrcPath);
 
         let updatedConfig;
         if (isFlatConfig(eslintConfig)) {
@@ -49,7 +55,7 @@ export function activate(context: vscode.ExtensionContext) {
           updatedConfig = updateRuleInLegacyConfig(eslintConfig, ruleName);
         }
 
-        await writeEslintConfig(eslintrcPath, updatedConfig);
+        await writeConfigFile(eslintrcPath, updatedConfig);
 
         vscode.window.showInformationMessage(
           `Successfully disabled rule "${ruleName}" in ESLint configuration file.`
@@ -73,180 +79,6 @@ function getRuleName(diagnostic: vscode.Diagnostic): string {
   const code = diagnostic.code;
   const ruleName = typeof code === 'object' ? code.value : (code as string);
   return String(ruleName);
-}
-
-function isFlatConfig(config: any): boolean {
-  return Array.isArray(config);
-}
-
-function updateRuleInFlatConfig(config: any[], ruleName: string): any[] {
-  // Look for an existing global config object (one without files property or with files: ["**/*"])
-  const globalConfigIndex = config.findIndex(
-    (cfg) => !cfg.files || (Array.isArray(cfg.files) && cfg.files.includes("**/*"))
-  );
-
-  if (globalConfigIndex === -1) {
-    // No global config found, add one at the end
-    config.push({
-      files: ["**/*"],
-      rules: {
-        [ruleName]: "off"
-      }
-    });
-  } else {
-    // Update existing global config
-    const globalConfig = config[globalConfigIndex];
-    if (!globalConfig.rules) {
-      globalConfig.rules = {};
-    }
-    globalConfig.rules[ruleName] = "off";
-  }
-
-  return config;
-}
-
-function updateRuleInLegacyConfig(config: any, ruleName: string): any {
-  if (!config.rules) {
-    config.rules = {};
-  }
-  config.rules[ruleName] = 0;
-  return config;
-}
-
-async function findEslintConfigFile(
-  currentFile: string
-): Promise<string | null> {
-  const configFileNames = [
-    // ESLint 9 flat config files (prioritize these)
-    'eslint.config.js',
-    'eslint.config.mjs',
-    'eslint.config.cjs',
-    // Legacy config files
-    '.eslintrc.js',
-    '.eslintrc.cjs',
-    '.eslintrc.json',
-    '.eslintrc',
-    'package.json',
-  ];
-
-  // find the nearest ESLint config file
-  let dir = path.dirname(currentFile);
-
-  // eslint-disable-next-line no-constant-condition
-  while (true) {
-    for (const configFileName of configFileNames) {
-      const configFilePath = path.join(dir, configFileName);
-      if (await fs.pathExists(configFilePath)) {
-        if (configFileName === 'package.json') {
-          const packageJson = await fs.readJson(configFilePath);
-          if (!packageJson.eslintConfig) {
-            continue;
-          }
-        }
-
-        return configFilePath;
-      }
-    }
-
-    const parentDir = path.dirname(dir);
-    if (dir === parentDir) {
-      break;
-    }
-    dir = parentDir;
-  }
-
-  return null;
-}
-
-async function readEslintConfig(configPath: string): Promise<any> {
-  const ext = path.extname(configPath);
-  const fileName = path.basename(configPath);
-  
-  // Remove .temp suffix for detection logic
-  const baseFileName = fileName.replace(/\.temp$/, '');
-
-  // Handle ESLint 9 flat config files
-  if (baseFileName.startsWith('eslint.config.')) {
-    const baseExt = path.extname(baseFileName);
-    if (baseExt === '.mjs') {
-      // ES module - use dynamic import
-      try {
-        const config = await import(`file://${configPath}`);
-        return config.default || config;
-      } catch (error) {
-        // Fallback to reading as text and evaluating
-        const content = await fs.readFile(configPath, 'utf8');
-        const exportMatch = content.match(/export\s+default\s+(.+);?\s*$/s);
-        if (exportMatch) {
-          return JSON.parse(exportMatch[1]);
-        }
-        throw error;
-      }
-    } else if (baseExt === '.cjs' || baseExt === '.js') {
-      // CommonJS module
-      delete require.cache[require.resolve(configPath)];
-      return require(configPath);
-    }
-  }
-
-  // Handle legacy config files
-  if (ext === '.js' || ext === '.cjs') {
-    delete require.cache[require.resolve(configPath)];
-    return require(configPath);
-  } else if (baseFileName === 'package.json') {
-    const packageJson = await fs.readJson(configPath);
-    return packageJson.eslintConfig;
-  } else if (ext === '.json' || ext === '') {
-    return fs.readJson(configPath);
-  }
-
-  throw new Error(`Unsupported ESLint configuration format: ${configPath}`);
-}
-
-async function writeEslintConfig(
-  configPath: string,
-  config: any
-): Promise<void> {
-  const ext = path.extname(configPath);
-  const fileName = path.basename(configPath);
-  
-  // Remove .temp suffix for detection logic
-  const baseFileName = fileName.replace(/\.temp$/, '');
-
-  // Handle ESLint 9 flat config files
-  if (baseFileName.startsWith('eslint.config.')) {
-    const baseExt = path.extname(baseFileName);
-    if (baseExt === '.mjs') {
-      // ES module format
-      const configContent = `export default ${JSON.stringify(config, null, 2)};`;
-      await fs.writeFile(configPath, configContent);
-    } else if (baseExt === '.cjs') {
-      // CommonJS format
-      const configContent = `module.exports = ${JSON.stringify(config, null, 2)};`;
-      await fs.writeFile(configPath, configContent);
-    } else if (baseExt === '.js') {
-      // Default to CommonJS for .js files in flat config
-      const configContent = `module.exports = ${JSON.stringify(config, null, 2)};`;
-      await fs.writeFile(configPath, configContent);
-    }
-    return;
-  }
-
-  // Handle legacy config files
-  if (ext === '.js' || ext === '.cjs') {
-    await fs.writeFile(
-      configPath,
-      `module.exports = ${JSON.stringify(config, null, 2)}`
-    );
-  } else if (baseFileName === 'package.json') {
-    const packageJson = await fs.readJson(configPath);
-    packageJson.eslintConfig = config;
-    await fs.writeJson(configPath, packageJson, { spaces: 2 });
-  } else if (ext === '.json' || ext === '') {
-    await fs.writeJson(configPath, config, { spaces: 2 });
-  } else {
-    throw new Error(`Unsupported ESLint configuration format: ${configPath}`);
-  }
 }
 
 class DisableEslintRuleProvider implements vscode.CodeActionProvider {
