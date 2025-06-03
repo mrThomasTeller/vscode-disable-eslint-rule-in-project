@@ -10,6 +10,9 @@ This Visual Studio Code extension allows you to quickly disable an ESLint rule d
 
 - Adds a "Disable rule {rule-name} in project" option to the Quick Fix menu for ESLint errors.
 - Automatically updates the ESLint configuration file in your project to disable the selected rule.
+- Supports both legacy ESLint configuration formats and new flat config format.
+- Works with CommonJS flat config files (`eslint.config.js`, `eslint.config.cjs`) with automatic modification.
+- Provides manual instructions for ESM flat config files (`eslint.config.mjs`).
 
 ## Requirements
 
@@ -24,7 +27,9 @@ This extension works in conjunction with the [ESLint extension](https://marketpl
 
 ## Known Limitations
 
-- This extension currently supports only `.eslintrc.json`, `.eslintrc.js` and `package.json` ESLint configuration file formats. Other formats, like `.yml` and `.yaml`, are not supported.
+- This extension supports `.eslintrc.json`, `.eslintrc.js`, `.eslintrc.cjs`, `package.json` (legacy formats), and `eslint.config.js`, `eslint.config.cjs`, `eslint.config.mjs` (flat config formats).
+- For ESM flat config files (`eslint.config.mjs`), automatic modification is not supported due to limitations with dynamic imports. The extension will show manual instructions instead.
+- Legacy config formats like `.yml` and `.yaml` are not supported.
 
 ## Contributing
 

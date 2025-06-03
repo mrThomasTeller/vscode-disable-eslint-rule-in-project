@@ -38,25 +38,36 @@ export function activate(context: vscode.ExtensionContext) {
       }
 
       try {
-        const eslintrcJson = await readEslintConfig(eslintrcPath);
+        const eslintConfig = await readEslintConfig(eslintrcPath);
 
-        if (!eslintrcJson.rules) {
-          eslintrcJson.rules = {};
+        let updatedConfig;
+        if (isFlatConfig(eslintrcPath)) {
+          // Handle flat config
+          updatedConfig = addRuleToFlatConfig(eslintConfig, ruleName);
+        } else {
+          // Handle legacy config
+          if (!eslintConfig.rules) {
+            eslintConfig.rules = {};
+          }
+          eslintConfig.rules[ruleName] = 0;
+          updatedConfig = eslintConfig;
         }
 
-        eslintrcJson.rules[ruleName] = 0;
-
-        await writeEslintConfig(eslintrcPath, eslintrcJson);
+        await writeEslintConfig(eslintrcPath, updatedConfig);
 
         vscode.window.showInformationMessage(
-          `Successfully disabled rule "${ruleName}" in .eslintrc file.`
+          `Successfully disabled rule "${ruleName}" in ESLint configuration file.`
         );
       } catch (error) {
-        vscode.window.showErrorMessage(
-          `An error occurred while updating .eslintrc file: ${
-            (error as any).message
-          }`
-        );
+        if ((error as Error).message === 'ESM_CONFIG_MODIFICATION_NOT_SUPPORTED') {
+          showESMInstructions(ruleName, eslintrcPath);
+        } else {
+          vscode.window.showErrorMessage(
+            `An error occurred while updating ESLint configuration file: ${
+              (error as any).message
+            }`
+          );
+        }
       }
     }
   );
@@ -66,16 +77,98 @@ export function activate(context: vscode.ExtensionContext) {
 
 export function deactivate() {}
 
-function getRuleName(diagnostic: vscode.Diagnostic) {
+function getRuleName(diagnostic: vscode.Diagnostic): string {
   const code = diagnostic.code;
   const ruleName = typeof code === 'object' ? code.value : (code as string);
-  return ruleName;
+  return String(ruleName);
+}
+
+function isFlatConfig(configPath: string): boolean {
+  const fileName = path.basename(configPath);
+  return fileName.startsWith('eslint.config.');
+}
+
+function isESMConfig(configPath: string): boolean {
+  const fileName = path.basename(configPath);
+  return fileName.endsWith('.mjs');
+}
+
+async function readFlatConfigCJS(configPath: string): Promise<any[]> {
+  // Clear require cache to ensure fresh read
+  delete require.cache[require.resolve(configPath)];
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const config = require(configPath);
+  return Array.isArray(config) ? config : [config];
+}
+
+async function readFlatConfigESM(configPath: string): Promise<any[]> {
+  // Use dynamic import for ESM modules
+  const configModule = await import(`file://${configPath}?t=${Date.now()}`);
+  const config = configModule.default || configModule;
+  return Array.isArray(config) ? config : [config];
+}
+
+async function writeFlatConfigCJS(configPath: string, config: any[]): Promise<void> {
+  const configString = `module.exports = ${JSON.stringify(config, null, 2)};`;
+  await fs.writeFile(configPath, configString);
+}
+
+function showESMInstructions(ruleName: string, configPath: string): void {
+  const instructions = `Cannot automatically modify ESM config file. Please manually add the following rule to your ${path.basename(configPath)}:
+
+Add or modify a configuration object in the exported array:
+{
+  rules: {
+    "${ruleName}": "off"
+  }
+}
+
+Example:
+export default [
+  // ... other configs
+  {
+    rules: {
+      "${ruleName}": "off"
+    }
+  }
+];`;
+
+  vscode.window.showWarningMessage(
+    `ESM config detected. Manual modification required.`,
+    'Show Instructions'
+  ).then(selection => {
+    if (selection === 'Show Instructions') {
+      vscode.workspace.openTextDocument({ content: instructions, language: 'javascript' })
+        .then(doc => vscode.window.showTextDocument(doc));
+    }
+  });
+}
+
+function addRuleToFlatConfig(configs: any[], ruleName: string): any[] {
+  // Find existing config with rules or create new one
+  let ruleConfig = configs.find(config => config.rules);
+  
+  if (!ruleConfig) {
+    ruleConfig = { rules: {} };
+    configs.push(ruleConfig);
+  }
+  
+  if (!ruleConfig.rules) {
+    ruleConfig.rules = {};
+  }
+  
+  ruleConfig.rules[ruleName] = 'off';
+  
+  return configs;
 }
 
 async function findEslintConfigFile(
   currentFile: string
 ): Promise<string | null> {
   const configFileNames = [
+    'eslint.config.js',
+    'eslint.config.mjs',
+    'eslint.config.cjs',
     '.eslintrc.js',
     '.eslintrc.cjs',
     '.eslintrc.json',
@@ -116,6 +209,16 @@ async function readEslintConfig(configPath: string): Promise<any> {
   const ext = path.extname(configPath);
   const fileName = path.basename(configPath);
 
+  // Handle flat config files
+  if (isFlatConfig(configPath)) {
+    if (isESMConfig(configPath)) {
+      return await readFlatConfigESM(configPath);
+    } else {
+      return await readFlatConfigCJS(configPath);
+    }
+  }
+
+  // Handle legacy config files
   if (ext === '.js') {
     return require(configPath);
   } else if (fileName === 'package.json') {
@@ -135,6 +238,17 @@ async function writeEslintConfig(
   const ext = path.extname(configPath);
   const fileName = path.basename(configPath);
 
+  // Handle flat config files
+  if (isFlatConfig(configPath)) {
+    if (isESMConfig(configPath)) {
+      throw new Error('ESM_CONFIG_MODIFICATION_NOT_SUPPORTED');
+    } else {
+      await writeFlatConfigCJS(configPath, config);
+      return;
+    }
+  }
+
+  // Handle legacy config files
   if (ext === '.js') {
     await fs.writeFile(
       configPath,
