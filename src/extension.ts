@@ -116,7 +116,7 @@ async function readEslintConfig(configPath: string): Promise<any> {
   const ext = path.extname(configPath);
   const fileName = path.basename(configPath);
 
-  if (ext === '.js') {
+  if (ext === '.js' || ext === '.cjs') {
     return require(configPath);
   } else if (fileName === 'package.json') {
     const packageJson = await fs.readJson(configPath);
@@ -135,10 +135,10 @@ async function writeEslintConfig(
   const ext = path.extname(configPath);
   const fileName = path.basename(configPath);
 
-  if (ext === '.js') {
+  if (ext === '.js' || ext === '.cjs') {
     await fs.writeFile(
       configPath,
-      `module.exports = ${JSON.stringify(config, null, 2)}`
+      `module.exports = ${JSON.stringify(config, null, 2)}\n`
     );
   } else if (fileName === 'package.json') {
     const packageJson = await fs.readJson(configPath);
